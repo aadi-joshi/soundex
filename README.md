@@ -16,6 +16,9 @@ Current centralized music streaming platforms face several critical issues:
 
 The centralization of control leads to data privacy concerns, potential censorship, and lack of transparency. Artists often struggle with unfair royalty payment structures that don't adequately compensate them for their work. Geographic restrictions and licensing limitations prevent universal access to music. Copyright disputes must be handled through traditional support channels or legal systems, lacking technological solutions.
 
+## Problems in Classical Method:
+![image](https://github.com/user-attachments/assets/504b4d43-2568-4315-9ad6-c120dbb2795b)
+
 ## Solution Overview
 
 Soundex revolutionizes music distribution through blockchain technology, providing:
@@ -24,6 +27,9 @@ Soundex revolutionizes music distribution through blockchain technology, providi
 - Direct artist control over music rights without label dependency
 - User rewards for platform engagement
 - Blockchain-secured privacy and data protection
+
+## Key Features of Soundex
+![image](https://github.com/user-attachments/assets/e4bdeaea-a575-4a96-a876-13b522647f93)
 
 ## Technical Architecture
 
@@ -77,6 +83,9 @@ Soundex revolutionizes music distribution through blockchain technology, providi
 3. **React Toastify**
    - Purpose: User notification system
    - Methods: `toast.success()` and `toast.error()` for real-time feedback
+
+## User/Backend/Blockchain Flow Diagram
+![image](https://github.com/user-attachments/assets/ad3021b2-e62b-4287-8302-3e5962f9a4d4)
 
 ## Project Access
 
