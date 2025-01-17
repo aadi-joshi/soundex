@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState} from 'react'
 import { toast } from 'react-toastify';
+import ipfsClient from '../config/ipfsConfig';
+import nftStorage from '../config/ipfsConfig';
 
 import useEth from '../contexts/EthContext/useEth';
 import SongList from '../components/SongList';
@@ -14,60 +16,116 @@ const Upload = ({selectedSong, setSelectedSong}) => {
 
   const [songs, setSongs] = useState([]);
 
+  // Add these new state hooks
+  const [openPopup, setOpenPopup] = useState(false);
+  const [notify, setNotify] = useState({
+    isOpen: false,
+    message: '',
+    type: ''
+  });
+
   useEffect(() => {
     const getSongs = async () => {
-      const allSongsIds = await state.contract.methods.getOwnedSongs().call({ from: state.account });
-      console.log("getOwnedSongs",allSongsIds);
-      const songs = await Promise.all(allSongsIds.map(async (songId) => {
-        const song = await state.contract.methods.getSongDetails(songId).call({ from: state.account });
-        // const songFile = await state.ifsClient.get(songId);
-        return {
-          'songName' : song[0],
-          'artistAddr' : song[1],
-          'artistName' : song[2],
-          'likeCount' : song[3],
-          'dislikeCount' : song[4],
-          'cost' : song[5],
-          'songStatus' : song[6],
-          'songURL' : `https://${songId}.ipfs.w3s.link/${song[7]}`,
-          'songHash': songId,
-          'songFileName': song[7]
-        };
-      }));
-      console.log("songs",songs);
-      setSongs(songs);
+      try {
+        const allSongsIds = await state.contract.methods.getOwnedSongs().call({ from: state.account });
+        console.log("getOwnedSongs",allSongsIds);
+        const songs = await Promise.all(allSongsIds.map(async (songId) => {
+          const song = await state.contract.methods.getSongDetails(songId).call({ from: state.account });
+          return {
+            'songName' : song[0],
+            'artistAddr' : song[1],
+            'artistName' : song[2],
+            'likeCount' : song[3],
+            'dislikeCount' : song[4],
+            'cost' : song[5],
+            'songStatus' : song[6],
+            'songURL' : song[7].startsWith('http') ? song[7] : `https://ipfs.io/ipfs/${song[7]}`,
+            'songHash': songId,
+            'songFileName': song[7]
+          };
+        }));
+        console.log("songs",songs);
+        setSongs(songs);
+      } catch (error) {
+        console.error('Error fetching songs:', error);
+        toast.error('Error fetching songs');
+      }
     }
     if (state.contract && state.account) {
       getSongs();
     }
   }, [state.contract, state.account, toggle]);
 
-  const handleAddNewSong = async ({songName, songCost, songFile, closePopup}) => {
-    console.log("songName", songName);
-    console.log("songCost", songCost);
-    console.log("songFile", songFile);
-
-    // songFile.screenName = songName;
-    const songFileName = songFile.name;
-    const songHash = await state.ipfsClient.put([songFile]);
-    console.log('File uploaded with CID:', songFileName, songName, songHash);
-    // const songHash = ipfsUpload.path;
-
-    state.contract.methods
-      .uploadSong(songName, songHash, songFileName, songCost).send({ from: state.account })
-      .then(data => {
-        console.log("upload successful :", data)
-        toast.success('Song uploaded !', {
-          position: toast.POSITION.TOP_RIGHT
-        });
-        closePopup();
-        setToggle(toggle => !toggle);
-      }).catch(err => {
-        toast.error(Util.metamaskErrorParser(err), {
-          position: toast.POSITION.TOP_RIGHT
-      })
+  const handleAddNewSong = async (values) => {
+    try {
+      setOpenPopup(false);
+      setNotify({
+        isOpen: true,
+        message: 'Uploading song to IPFS...',
+        type: 'info',
       });
-  }
+
+      // File size validation (50MB limit)
+      if (values.songFile.size > 50 * 1024 * 1024) {
+        throw new Error('File size should be less than 50MB');
+      }
+
+      // Create blob with proper metadata
+      const songBlob = new Blob([values.songFile], { 
+        type: values.songFile.type 
+      });
+      
+      // Upload to NFT.storage with proper headers
+      let result;
+      try {
+        result = await nftStorage.storeBlob(songBlob, {
+          headers: {
+            'Authorization': `Bearer ${nftStorage.token}`,
+            'Content-Type': 'application/car'
+          }
+        });
+      } catch (error) {
+        console.error('First upload attempt failed, retrying...', error);
+        // Retry with explicit headers
+        result = await nftStorage.storeBlob(songBlob, {
+          headers: {
+            'Authorization': `Bearer ${nftStorage.token}`,
+            'Content-Type': 'application/car'
+          }
+        });
+      }
+
+      const url = `https://ipfs.io/ipfs/${result}`;
+
+      // Continue with contract interaction
+      state.contract.methods
+        .uploadSong(values.songName.trim(), values.songCost, url)
+        .send({ from: state.account })
+        .then((data) => {
+          setNotify({
+            isOpen: true,
+            message: 'Song uploaded successfully',
+            type: 'success',
+          });
+          values.closePopup();
+        })
+        .catch((error) => {
+          let msg = Util.metamaskErrorParser(error);
+          setNotify({
+            isOpen: true,
+            message: msg,
+            type: 'error',
+          });
+        });
+    } catch (error) {
+      console.error('Error uploading to IPFS:', error);
+      setNotify({
+        isOpen: true,
+        message: `Upload failed: ${error.message}`,
+        type: 'error',
+      });
+    }
+  };
 
   return (
     <div>
